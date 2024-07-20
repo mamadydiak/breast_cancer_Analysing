@@ -1,0 +1,189 @@
+---
+title: "HOMEWORK1- PCA with LOGISTIC REGRESSION"
+author: "Mamady III DIAKITE"
+output: html_document
+date: "2023-12-1"
+---
+# PART1
+
+### A.Read the data-set as a data frame.
+
+```{r}
+myDataFrame <- read.csv("data.csv")
+
+```
+
+### B.Check data types using the str function:
+
+```{r}
+skim_to_wide(data)
+```
+
+### C.Check for any missing values
+
+
+```{r}
+myData <- myDataFrame[, 1:32]  # Extracting columns 1 to 32
+sum(is.na(myData))  # Count total missing values
+sapply(myData, function(x) sum(is.na(x)))  # Count missing values for each column
+```
+
+### D. Correlation using corrplot:
+
+
+```{r}
+library(corrplot)
+numeric_data <- myData[, sapply(myDataFrame, is.numeric)]  # Select numeric columns
+
+correlation_matrix <- cor(numeric_data)  # Calculate correlation matrix
+
+corrplot(correlation_matrix, method = "circle")  # Plot correlation matrix
+```
+
+### E. Discuss multicollinearity:
+
+ Multicollinearity occurs when two or more independent variables are highly correlated.
+ Here, we noted that multicollinearity exists due to positive correlations between attributes like area_mean x     radius_mean.
+ All of them are positive correlation.
+ 
+# PART 2
+
+### A. Split data into train and test:
+
+```{r}
+library(caTools)
+myData$diagnosis <- factor(myData$diagnosis)  # Convert diagnosis to a factor
+set.seed(123)
+ind <- sample(2, nrow(myData), replace = TRUE, prob = c(0.7, 0.3))  # Split into train (70%) and test (30%)
+train <- myData[ind == 1,]  # Select train data
+test <- myData[ind == 2,]   # Select test data
+```
+
+### B. Build logistic model:
+
+```{r}
+fit <- glm(diagnosis ~ . , family=binomial, train)
+
+summary(fit)
+```
+
+### C. Discuss about the summary of your model.
+
+ In this output, the p-values for most variables are high (close to 1), indicating that these predictors are not statistically significant. This might suggest that the model is overfitting or that some variables do not contribute significantly to predicting the response.
+The residual deviance is very close to zero, indicating a good fit of the model to the data.
+The AIC value of 64 is a measure of the model fit. Lower AIC values are generally better, but the interpretation depends on the context and the comparison with other models.
+
+### D. Use predict function and then get the confusion matrix:
+
+```{r}
+predictions <- predict(fit, newdata = test, type = "response")  # Make predictions
+threshold <- 0.5  # Set threshold for classifying predictions
+predicted_classes <- ifelse(predictions > threshold, 1, 0)  # Classify predictions
+
+test$diagnosis <- ifelse(test$diagnosis == "M", 1, 0)  # Convert test diagnosis to binary
+```
+Confusion matrix
+```{r}
+library(caret)
+conf_matrix2 <- confusionMatrix(data = factor(predicted_classes), reference = factor(test$diagnosis), positive = "1")
+conf_matrix2
+```
+
+### E. Discuss performance measures:
+
+ Performance Metrics:
+ Accuracy: 0.878
+ 
+ Logistic Regression achieved an overall accuracy of 87.8%.
+ Sensitivity (True Positive Rate): 0.9143
+ 
+ The model correctly identified 91.43% of actual positive cases.
+ Specificity (True Negative Rate): 0.8511
+ 
+ Logistic Regression correctly identified 85.11% of actual negative cases.
+ Positive Predictive Value (Precision): 0.8205
+ 
+ 82.05% of predicted positives are true positives in Logistic Regression.
+ Negative Predictive Value: 0.9302
+ 
+ 93.02% of predicted negatives are true negatives in Logistic Regression.
+
+# PART 3:
+
+### A. Apply PCA and choose your PC’s:
+
+```{r}
+features <- myData[, 3:ncol(myData)]  # Select features
+scaled_features <- scale(features)  # Standardize features
+pca_result <- prcomp(scaled_features)  # Apply PCA
+summary(pca_result)
+```
+
+### B. Use logistic regression with your PCs:
+
+```{r}
+chosen_components <- 2  # Number of principal components
+pc_data <- as.data.frame(pca_result$x[, 1:chosen_components])  # Select principal components
+pc_data$diagnosis <- myData$diagnosis  # Add diagnosis column
+```
+
+### C. Discuss about the summary of your model.
+
+Both PCA's are almost equally important.
+The coefficients for PC1 and PC2 indicate the direction and strength of the relationship between each principal component and the log-odds of the response variable.
+In this case, PC1 has a negative coefficient, suggesting a negative association with the response variable. PC2 has a positive coefficient, suggesting a positive association.
+The significance of PC1 and PC2 indicates that they are important predictors in the logistic regression model.
+Build logistic model
+```{r}
+model_pca <- glm(diagnosis ~ ., data = pc_data, family = "binomial")  # Build logistic model with PCA
+summary(model_pca)  # Display summary of the PCA model
+```
+
+### D. Use predict function and then get the confusion matrix:
+
+```{r}
+# Applying PCA to the test data
+scaled_test_data <- scale(test[, 3:ncol(test)])  # Standardize test data
+pc_test_data <- predict(pca_result, newdata = scaled_test_data)[, 1:chosen_components]  # Apply PCA to test data
+class(pc_test_data)
+pc_test_data <- as.data.frame(pc_test_data)  # Convert to data frame
+class(pc_test_data)
+
+# Predict using the logistic model with PCs
+predictions_pca <- predict(model_pca, newdata = pc_test_data, type = "response")  # Make predictions with PCA
+predicted_classes_pca <- ifelse(predictions_pca > threshold, 1, 0)  # Classify predictions
+```
+
+
+
+```{r}
+# Confusion matrix
+conf_matrix_pca <- confusionMatrix(data = factor(predicted_classes_pca), reference = factor(test$diagnosis), positive = "1")
+conf_matrix_pca
+```
+
+### E. Discuss about the performance measures.
+
+ Similar to Part 2.E, metrics are discussed based on the confusion matrix of the PCA model.
+ This represents the overall correctness of predictions. In PCA, 67.68% of the predictions are correct.
+ Sensitivity (True Positive Rate): 0.8000
+ Sensitivity measures the ability of the model to correctly identify positive instances (class 1). Here, 80% of actual  positive cases were correctly identified by the PCA model.
+ Specificity (True Negative Rate): 0.5851
+
+##  F. Compare results 2.E and 3.E:
+
+ Compare performance metrics of Logistic Regression and PCA models.
+ Logistic Regression outperforms PCA in various metrics, indicating better predictive performance for the given dataset.
+ Logistic Regression has a higher ability to correctly identify negative cases.
+ Positive Predictive Value: Logistic Regression (0.8205) > PCA (0.5895)
+ 
+ Logistic Regression has a higher precision in predicting positive cases.
+ Negative Predictive Value: Logistic Regression (0.9302) > PCA (0.7971)
+ 
+ Logistic Regression has a higher accuracy in predicting negative cases.
+ In summary, Logistic Regression outperforms PCA in various metrics, indicating better predictive performance for the  given dataset. 
+ These metrics provide insights into how well each model is performing with respect to correctly classifying instances  of each class.
+
+
+
+
